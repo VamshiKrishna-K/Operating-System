@@ -1,0 +1,93 @@
+import random
+import matplotlib.pyplot as plt
+import pandas as pd
+from collections import deque
+
+# Input
+num_processes = int(input("Enter number of processes: "))
+time_quantum = int(input("Enter time quantum: "))
+
+processes = []
+for i in range(num_processes):
+    processes.append({
+        'PID': f'P{i+1}',
+        'AT': random.randint(0, 10),
+        'BT': random.randint(1, 10),
+        'RT': 0  # Remaining time
+    })
+
+# Initialize remaining time
+for p in processes:
+    p['RT'] = p['BT']
+
+# Sort by arrival time
+processes.sort(key=lambda x: x['AT'])
+
+time = 0
+completed = 0
+queue = deque()
+timeline = []
+i = 0  # index for process list
+
+while completed < num_processes:
+
+    # Add arrived processes to queue
+    while i < num_processes and processes[i]['AT'] <= time:
+        queue.append(processes[i])
+        i += 1
+
+    if not queue:
+        time += 1
+        continue
+
+    p = queue.popleft()
+    start = time
+
+    exec_time = min(time_quantum, p['RT'])
+    p['RT'] -= exec_time
+    time += exec_time
+
+    timeline.append((p['PID'], start, time))
+
+    # Add newly arrived processes during execution
+    while i < num_processes and processes[i]['AT'] <= time:
+        queue.append(processes[i])
+        i += 1
+
+    if p['RT'] > 0:
+        queue.append(p)
+    else:
+        p['CT'] = time
+        completed += 1
+
+# Calculate TAT & WT
+for p in processes:
+    p['TAT'] = p['CT'] - p['AT']
+    p['WT'] = p['TAT'] - p['BT']
+
+# Output
+df = pd.DataFrame(processes).sort_values(by='PID')
+print("\nRound Robin Scheduling")
+print(df[['PID','AT','BT','CT','TAT','WT']].to_string(index=False))
+print(f"Average Waiting Time:    {df['WT'].mean():.2f}")
+print(f"Average Turnaround Time: {df['TAT'].mean():.2f}")
+
+# Plot Gantt Chart
+fig, ax = plt.subplots(figsize=(10, 5))
+y_positions = {pid: i for i, pid in enumerate(df['PID'])}
+
+for label, start, end in timeline:
+    duration = end - start
+    y = y_positions[label]
+    ax.broken_barh([(start, duration)], (y - 0.4, 0.8))
+    ax.text(start + duration/2, y, label, ha='center', va='center', color='white')
+
+ax.set_yticks(range(len(df['PID'])))
+ax.set_yticklabels(df['PID'])
+ax.set_xlabel("Time")
+ax.set_ylabel("Process")
+ax.set_title("Gantt Chart - Round Robin Scheduling")
+ax.grid(True, axis='x', linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.show()
