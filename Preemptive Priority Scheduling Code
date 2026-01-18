@@ -1,0 +1,87 @@
+import random
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Input
+num_processes = int(input("Enter number of processes: "))
+processes = []
+
+for i in range(num_processes):
+    processes.append({
+        'PID': f'P{i+1}',
+        'AT': random.randint(0, 10),
+        'BT': random.randint(1, 10),
+        'PR': random.randint(1, 5),
+        'RT': 0  # Remaining Time
+    })
+
+# Initialize remaining time
+for p in processes:
+    p['RT'] = p['BT']
+
+time = 0
+completed = 0
+timeline = []
+current_process = None
+start_time = time
+
+while completed < num_processes:
+    # Available processes
+    available = [p for p in processes if p['AT'] <= time and p['RT'] > 0]
+
+    if not available:
+        time += 1
+        continue
+
+    # Select highest priority (lowest PR)
+    selected = min(available, key=lambda x: x['PR'])
+
+    # Context switch
+    if current_process != selected:
+        if current_process is not None:
+            timeline.append((current_process['PID'], start_time, time))
+        current_process = selected
+        start_time = time
+
+    # Execute 1 unit
+    selected['RT'] -= 1
+    time += 1
+
+    # If completed
+    if selected['RT'] == 0:
+        selected['CT'] = time
+        completed += 1
+        timeline.append((selected['PID'], start_time, time))
+        current_process = None
+
+# Calculate times
+for p in processes:
+    p['TAT'] = p['CT'] - p['AT']
+    p['WT'] = p['TAT'] - p['BT']
+
+df = pd.DataFrame(processes).sort_values(by='PID')
+print("\nPreemptive Priority Scheduling")
+print(df[['PID','AT','BT','PR','CT','TAT','WT']].to_string(index=False))
+print(f"Average Waiting Time:    {df['WT'].mean():.2f}")
+print(f"Average Turnaround Time: {df['TAT'].mean():.2f}")
+
+# Plot Gantt Chart
+fig, ax = plt.subplots(figsize=(10, 5))
+
+y_positions = {pid: i for i, pid in enumerate(df['PID'])}
+
+for label, start, end in timeline:
+    duration = end - start
+    y = y_positions[label]
+    ax.broken_barh([(start, duration)], (y - 0.4, 0.8))
+    ax.text(start + duration/2, y, label, ha='center', va='center', color='white')
+
+ax.set_yticks(range(len(df['PID'])))
+ax.set_yticklabels(df['PID'])
+ax.set_xlabel("Time")
+ax.set_ylabel("Process")
+ax.set_title("Gantt Chart - Preemptive Priority Scheduling")
+ax.grid(True, axis='x', linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.show()
