@@ -1,0 +1,92 @@
+import random
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Input
+num_processes = int(input("Enter number of processes: "))
+processes = []
+
+for i in range(num_processes):
+    processes.append({
+        'PID': f'P{i+1}',
+        'AT': random.randint(0, 10),
+        'BT': random.randint(1, 10),
+        'PR': random.randint(1, 5)   # Priority (1 = highest)
+    })
+
+# Sort initially by Arrival Time
+processes.sort(key=lambda x: x['AT'])
+
+current_time = 0
+completed = []
+timeline = []
+
+total_tat = 0
+total_wt = 0
+
+while processes:
+    # Get available processes
+    available = [p for p in processes if p['AT'] <= current_time]
+
+    if not available:
+        # CPU idle
+        next_at = min(processes, key=lambda x: x['AT'])['AT']
+        timeline.append(('Idle', current_time, next_at))
+        current_time = next_at
+        continue
+
+    # Select highest priority process (lowest PR value)
+    p = min(available, key=lambda x: x['PR'])
+
+    processes.remove(p)
+
+    p['Start'] = current_time
+    p['CT'] = current_time + p['BT']
+    p['TAT'] = p['CT'] - p['AT']
+    p['WT'] = p['TAT'] - p['BT']
+
+    total_tat += p['TAT']
+    total_wt += p['WT']
+
+    timeline.append((p['PID'], p['Start'], p['CT']))
+    current_time = p['CT']
+    completed.append(p)
+
+# Output
+df = pd.DataFrame(completed).sort_values(by='PID')
+print("\nPriority Scheduling (Non-Preemptive)")
+print(df.to_string(index=False))
+print(f"Average Waiting Time:    {total_wt / num_processes:.2f}")
+print(f"Average Turnaround Time: {total_tat / num_processes:.2f}")
+
+# Plot Gantt Chart
+fig, ax = plt.subplots(figsize=(10, 5))
+
+unique_pids = df['PID'].unique()
+y_positions = {pid: i for i, pid in enumerate(unique_pids)}
+mid_y = len(unique_pids) / 2 - 0.5
+
+for label, start, end in timeline:
+    duration = end - start
+    if duration == 0:
+        continue
+
+    if label == 'Idle':
+        ax.broken_barh([(start, duration)], (-0.5, len(unique_pids)), facecolors='tab:red', alpha=0.5)
+        ax.text(start + duration/2, mid_y, "Idle", ha='center', va='center',
+                color='white', fontweight='bold', rotation=90)
+    else:
+        y = y_positions[label]
+        ax.broken_barh([(start, duration)], (y - 0.4, 0.8), facecolors='tab:blue', edgecolor='black')
+        ax.text(start + duration/2, y, label, ha='center', va='center',
+                color='white', fontweight='bold')
+
+ax.set_yticks(range(len(unique_pids)))
+ax.set_yticklabels(unique_pids)
+ax.set_xlabel('Time')
+ax.set_ylabel('Process ID')
+ax.set_title('Gantt Chart - Priority Scheduling (Non-Preemptive)')
+ax.grid(True, axis='x', linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.show()
