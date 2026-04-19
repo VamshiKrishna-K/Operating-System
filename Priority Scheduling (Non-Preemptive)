@@ -2,7 +2,7 @@ import random
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# Input
+#  Input
 num_processes = int(input("Enter number of processes: "))
 processes = []
 
