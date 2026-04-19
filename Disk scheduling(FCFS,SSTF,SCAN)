@@ -1,0 +1,94 @@
+import random
+import matplotlib.pyplot as plt
+
+
+# -------- GRAPH --------
+def plot_graph(order, title):
+    plt.figure(figsize=(12, 6))
+    plt.plot(order, range(len(order)), marker='o')
+    plt.gca().invert_yaxis()
+    plt.xlabel("Cylinder")
+    plt.ylabel("Step")
+    plt.title(title)
+    plt.show()
+
+
+# -------- FCFS --------
+def fcfs(queue, head):
+    order = [head] + queue
+    total = sum(abs(order[i+1] - order[i]) for i in range(len(order)-1))
+
+    print("\nFCFS")
+    print("Order:", order)
+    print("Total Movement:", total)
+
+    plot_graph(order, "FCFS")
+
+
+# -------- SSTF --------
+def sstf(queue, head):
+    req = queue.copy()
+    order = [head]
+    total = 0
+
+    while req:
+        nearest = min(req, key=lambda x: abs(x - head))
+        total += abs(nearest - head)
+        head = nearest
+        order.append(nearest)
+        req.remove(nearest)
+
+    print("\nSSTF")
+    print("Order:", order)
+    print("Total Movement:", total)
+
+    plot_graph(order, "SSTF")
+
+
+# -------- SCAN --------
+def scan(queue, head, start, end, direction):
+    left = sorted([x for x in queue if x < head], reverse=True)
+    right = sorted([x for x in queue if x >= head])
+
+    order = [head]
+
+    if direction == "left":
+        order += left + [start] + right
+    else:
+        order += right + [end] + left
+
+    total = sum(abs(order[i+1] - order[i]) for i in range(len(order)-1))
+
+    print("\nSCAN")
+    print("Order:", order)
+    print("Total Movement:", total)
+
+    plot_graph(order, "SCAN")
+
+
+# -------- MAIN --------
+start = int(input("Start cylinder: "))
+end = int(input("End cylinder: "))
+n = int(input("Queue size: "))
+
+queue = [random.randint(start, end) for _ in range(n)]
+head = random.randint(start, end)
+
+print("\nQueue:", queue)
+print("Head:", head)
+
+print("\n1.FCFS  2.SSTF  3.SCAN")
+choice = int(input("Choice: "))
+
+if choice == 1:
+    fcfs(queue, head)
+
+elif choice == 2:
+    sstf(queue, head)
+
+elif choice == 3:
+    direction = "left" if input("Direction (l/r): ") == "l" else "right"
+    scan(queue, head, start, end, direction)
+
+else:
+    print("Invalid choice")
