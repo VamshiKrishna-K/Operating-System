@@ -1,12 +1,13 @@
 import random
 import matplotlib.pyplot as plt
+import pandas as pd
 
-# ---------- INPUT ----------
+# ---------- INPUT ---------
 method = input("Method (first / best / worst): ").lower()
 n_blocks = int(input("Blocks: "))
 n_files  = int(input("Files: "))
 
-# ---------- MEMORY ----------
+# ---------- MEMORY --------
 block_status = [random.randint(0, 1) for _ in range(n_blocks)]  # 0=free, 1=used
 block_sizes  = [random.randint(10, 60) if s == 0 else 0 for s in block_status]
 file_sizes   = [random.randint(5, 30) for _ in range(n_files)]
@@ -15,34 +16,35 @@ file_sizes   = [random.randint(5, 30) for _ in range(n_files)]
 allocation = [-1]*n_files
 fragment   = [0]*n_files
 used       = [False]*n_blocks
+timeline   = []
 
-# ---------- FREE BLOCKS ----------
+# ---------- FREE BLOCKS -----
 free_blocks = [(block_sizes[i], i) for i in range(n_blocks) if block_status[i] == 0]
 
 if method == "best":
-    free_blocks.sort()              # small → big
+    free_blocks.sort()
 elif method == "worst":
-    free_blocks.sort(reverse=True) # big → small
+    free_blocks.sort(reverse=True)
 
 # ---------- ALLOCATION ----------
 for f in range(n_files):
+    allocated = False
+
     for size, b in free_blocks:
         if size >= file_sizes[f] and not used[b]:
             allocation[f] = b
             fragment[f] = size - file_sizes[f]
             used[b] = True
+            timeline.append((f+1, file_sizes[f], b+1, size, fragment[f]))
+            allocated = True
             break
 
-# ---------- OUTPUT TABLE ----------
-print("\nFile  Size  Block  BlockSize  Frag")
-print("-"*40)
+    if not allocated:
+        timeline.append((f+1, file_sizes[f], 'NA', 'NA', 'NA'))
 
-for i in range(n_files):
-    if allocation[i] != -1:
-        b = allocation[i]
-        print(f"{i+1:<5}{file_sizes[i]:<6}B{b+1:<6}{block_sizes[b]:<11}{fragment[i]}")
-    else:
-        print(f"{i+1:<5}{file_sizes[i]:<6}NA    NA         NA")
+# ---------- OUTPUT TABLE ----------
+df = pd.DataFrame(timeline, columns=["File","Size","Block","BlockSize","Fragment"])
+print(df.to_string(index=False))
 
 # ---------- MAP BLOCK → FILE ----------
 block_map = {b: f"P{i+1}" for i, b in enumerate(allocation) if b != -1}
@@ -54,18 +56,14 @@ ax.set_xlim(0,1)
 ax.set_ylim(0,n_blocks)
 
 for i in range(n_blocks):
-    y = n_blocks-i-1
-
-    # label
+    y = n_blocks - i - 1
     ax.text(-0.05, y+0.5, f"B{i+1}", ha="center", va="center")
 
     if block_status[i] == 1:
         color, text = "yellow", "USED"
-
     elif used[i]:
         color = "green"
         text = f"{block_map.get(i,'')}\n{block_sizes[i]}"
-
     else:
         color = "white"
         text = f"{block_sizes[i]}"
