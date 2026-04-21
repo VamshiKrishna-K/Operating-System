@@ -1,0 +1,113 @@
+import random
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Input
+n = int(input("Enter number of processes: "))
+processes = []
+
+for i in range(n):
+    processes.append({
+        'PID': f'P{i+1}',
+        'AT': random.randint(0, 10),
+        'BT': random.randint(1, 10),
+        'RT': 0
+    })
+
+# Initialize Remaining Time
+for p in processes:
+    p['RT'] = p['BT']
+
+current_time = 0
+completed_n = 0
+timeline = []
+current_process = None
+start_time = 0
+
+# Scheduling Loop
+while completed_n < n:
+
+    available = [p for p in processes if p['AT'] <= current_time and p['RT'] > 0]
+
+    # CPU Idle (merged interval)
+    if not available:
+        if current_process is not None:
+            timeline.append((current_process['PID'], start_time, current_time))
+            current_process = None
+
+        idle_start = current_time
+        while True:
+            current_time += 1
+            available = [p for p in processes if p['AT'] <= current_time and p['RT'] > 0]
+            if available:
+                break
+
+        timeline.append(('Idle', idle_start, current_time))
+        continue
+
+    # Select process with shortest remaining time (tie-break AT)
+    selected = min(available, key=lambda x: (x['RT'], x['AT']))
+
+    # Context Switch
+    if current_process != selected:
+        if current_process is not None:
+            timeline.append((current_process['PID'], start_time, current_time))
+        current_process = selected
+        start_time = current_time
+
+    # Execute 1 unit
+    selected['RT'] -= 1
+    current_time += 1
+
+    # Completion
+    if selected['RT'] == 0:
+        selected['CT'] = current_time
+        completed_n += 1
+        timeline.append((selected['PID'], start_time, current_time))
+        current_process = None
+
+# Calculate TAT and WT
+for p in processes:
+    p['TAT'] = p['CT'] - p['AT']
+    p['WT'] = p['TAT'] - p['BT']
+
+# Output
+df = pd.DataFrame(processes).sort_values(by='PID')
+
+print("\nPreemptive SJF Scheduling (SRTF)")
+print(df[['PID','AT','BT','CT','TAT','WT']].to_string(index=False))
+print(f"Average Waiting Time:    {df['WT'].mean():.2f}")
+print(f"Average Turnaround Time: {df['TAT'].mean():.2f}")
+
+# Gantt Chart
+fig, ax = plt.subplots(figsize=(10, 5))
+
+y_positions = {pid: i for i, pid in enumerate(df['PID'])}
+mid_y = len(df['PID']) / 2 - 0.5
+
+for label, start, end in timeline:
+    duration = end - start
+    if duration <= 0:
+        continue
+
+    if label == 'Idle':
+        ax.broken_barh([(start, duration)], (-0.5, len(df)),
+                       facecolors='tab:red', alpha=0.5)
+        ax.text(start + duration/2, mid_y, "Idle",
+                ha='center', va='center', color='white', rotation=90)
+    else:
+        y = y_positions[label]
+        ax.broken_barh([(start, duration)], (y - 0.4, 0.8),
+                       facecolors='tab:blue', edgecolor='black')
+        ax.text(start + duration/2, y, label,
+                ha='center', va='center', color='white')
+
+ax.set_yticks(range(len(df)))
+ax.set_yticklabels(df['PID'])
+ax.set_xlabel("Time")
+ax.set_ylabel("Process")
+ax.set_title("Gantt Chart - Preemptive SJF (SRTF)")
+ax.grid(True, axis='x', linestyle='--', alpha=0.6)
+
+plt.tight_layout()
+plt.show()
