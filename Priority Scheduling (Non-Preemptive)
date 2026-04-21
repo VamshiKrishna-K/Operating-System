@@ -2,7 +2,7 @@ import random
 import matplotlib.pyplot as plt
 import pandas as pd
 
-#  Input
+# Input
 num_processes = int(input("Enter number of processes: "))
 processes = []
 
@@ -11,55 +11,56 @@ for i in range(num_processes):
         'PID': f'P{i+1}',
         'AT': random.randint(0, 10),
         'BT': random.randint(1, 10),
-        'PR': random.randint(1, 5)   # Priority (1 = highest)
+        'PR': random.randint(1, 5),
+        'Completed': False
     })
 
-# Sort initially by Arrival Time
+# Sort by Arrival Time
 processes.sort(key=lambda x: x['AT'])
 
 current_time = 0
-completed = []
 timeline = []
-
 total_tat = 0
 total_wt = 0
+completed_n = 0
 
-while processes:
-    # Get available processes
-    available = [p for p in processes if p['AT'] <= current_time]
+while completed_n < num_processes:
+
+    available = [p for p in processes if p['AT'] <= current_time and not p['Completed']]
 
     if not available:
-        # CPU idle
-        next_at = min(processes, key=lambda x: x['AT'])['AT']
+        remaining = [p for p in processes if not p['Completed']]
+        next_at = min(p['AT'] for p in remaining)
         timeline.append(('Idle', current_time, next_at))
         current_time = next_at
         continue
 
-    # Select highest priority process (lowest PR value)
-    p = min(available, key=lambda x: x['PR'])
+    # Select highest priority (lowest PR value)
+    priority_process = min(available, key=lambda x: (x['PR'], x['AT']))
 
-    processes.remove(p)
+    priority_process['Start'] = current_time
+    priority_process['CT'] = current_time + priority_process['BT']
+    priority_process['TAT'] = priority_process['CT'] - priority_process['AT']
+    priority_process['WT'] = priority_process['TAT'] - priority_process['BT']
 
-    p['Start'] = current_time
-    p['CT'] = current_time + p['BT']
-    p['TAT'] = p['CT'] - p['AT']
-    p['WT'] = p['TAT'] - p['BT']
+    total_tat += priority_process['TAT']
+    total_wt += priority_process['WT']
 
-    total_tat += p['TAT']
-    total_wt += p['WT']
+    timeline.append((priority_process['PID'],priority_process['Start'],priority_process['CT']))
 
-    timeline.append((p['PID'], p['Start'], p['CT']))
-    current_time = p['CT']
-    completed.append(p)
+    current_time = priority_process['CT']
+    priority_process['Completed'] = True
+    completed_n += 1
 
 # Output
-df = pd.DataFrame(completed).sort_values(by='PID')
+df = pd.DataFrame(processes).sort_values(by='PID')
+
 print("\nPriority Scheduling (Non-Preemptive)")
-print(df.to_string(index=False))
+print(df[['PID','AT','BT','PR','Start','CT','TAT','WT']].to_string(index=False))
 print(f"Average Waiting Time:    {total_wt / num_processes:.2f}")
 print(f"Average Turnaround Time: {total_tat / num_processes:.2f}")
 
-# Plot Gantt Chart
+# Gantt Chart
 fig, ax = plt.subplots(figsize=(10, 5))
 
 unique_pids = df['PID'].unique()
@@ -72,14 +73,12 @@ for label, start, end in timeline:
         continue
 
     if label == 'Idle':
-        ax.broken_barh([(start, duration)], (-0.5, len(unique_pids)), facecolors='tab:red', alpha=0.5)
-        ax.text(start + duration/2, mid_y, "Idle", ha='center', va='center',
-                color='white', fontweight='bold', rotation=90)
+        ax.broken_barh([(start, duration)], (-0.5, len(unique_pids)),facecolors='tab:red', alpha=0.5)
+        ax.text(start + duration/2, mid_y, "Idle",ha='center', va='center', color='white', rotation=90)
     else:
         y = y_positions[label]
-        ax.broken_barh([(start, duration)], (y - 0.4, 0.8), facecolors='tab:blue', edgecolor='black')
-        ax.text(start + duration/2, y, label, ha='center', va='center',
-                color='white', fontweight='bold')
+        ax.broken_barh([(start, duration)], (y - 0.4, 0.8),facecolors='tab:blue', edgecolor='black')
+        ax.text(start + duration/2, y, label,ha='center', va='center', color='white')
 
 ax.set_yticks(range(len(unique_pids)))
 ax.set_yticklabels(unique_pids)
